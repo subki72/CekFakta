@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { sendFeedback } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export default function FeedbackPage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [subject, setSubject] = useState("");

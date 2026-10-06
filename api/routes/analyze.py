@@ -12,25 +12,25 @@ Accepts TEXT, URL, or IMAGE input, processes it through the pipeline:
 8. Return result
 """
 
-from fastapi import APIRouter, Request, UploadFile, File, Form
+import base64
+import logging
+import re
+
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from api.models.schemas import InputType
 from api.services.groq_analyzer import analyze_text
-from api.services.scraper import scrape_url
 from api.services.ocr_service import extract_text_from_image
+from api.services.scraper import scrape_url
 from api.services.supabase_client import get_supabase_client
-from api.utils.rate_limiter import check_rate_limit, get_client_ip_hash
-from api.utils.language_detector import detect_language
+from api.utils.auth import get_current_user_optional
 from api.utils.content_classifier import is_political_content
-from api.utils.auth import require_auth
+from api.utils.language_detector import detect_language
+from api.utils.rate_limiter import check_rate_limit, get_client_ip_hash
 
-import base64
-
+logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-import re
 
 def sterilize_input(text: str) -> str:
     """SR2.1: Sterilize input by removing control characters that might confuse LLM."""
@@ -55,8 +55,17 @@ async def analyze(
 
     # Step 2: Extract text based on input type
     extracted_text = ""
-    # SR2.1: Sterilize raw input
     raw_input_stored = sterilize_input(raw_input)
+
+    if raw_input_stored and len(raw_input_stored) > 100000:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "success": False,
+                "error": "Panjang input teks melebihi batas maksimum 100.000 karakter.",
+                "code": "VALIDATION_ERROR",
+            },
+        )
 
     try:
         if input_type == InputType.URL:
@@ -96,6 +105,8 @@ async def analyze(
                 raw_input_stored = f"[IMAGE:{image.filename}]"
             else:
                 # Handle base64 string from form
+                if raw_input_stored and len(raw_input_stored) > 7 * 1024 * 1024:
+                    raise ValueError("Ukuran data gambar base64 melebihi batas 5MB.")
                 image_data = raw_input_stored
                 raw_input_stored = "[IMAGE:base64]"
 
@@ -117,7 +128,7 @@ async def analyze(
         # SR3.2: Log failed OCR attempts
         try:
             supabase = get_supabase_client()
-            user_id = await require_auth(request)
+            user_id = await get_current_user_optional(request)
             ip_hash = get_client_ip_hash(request)
             supabase.table("audit_logs").insert({
                 "user_id": user_id,
@@ -125,8 +136,8 @@ async def analyze(
                 "action_type": "ANALYSIS_FAILED",
                 "details": {"error": str(e), "input_type": input_type}
             }).execute()
-        except Exception:
-            pass
+        except Exception as log_err:
+            logger.warning(f"Failed to record audit log for failed analysis: {log_err}")
 
         return JSONResponse(
             status_code=400,
@@ -184,7 +195,7 @@ async def analyze(
             status_code=500,
             content={
                 "success": False,
-                "error": f"Gagal menganalisis teks: {str(e)}",
+                "error": f"Gagal menganalisis teks: {e!s}",
                 "code": "ANALYSIS_ERROR",
             },
         )
@@ -193,7 +204,7 @@ async def analyze(
     ip_hash = get_client_ip_hash(request)
 
     # Get user_id from auth header if present
-    user_id = await require_auth(request)
+    user_id = await get_current_user_optional(request)
 
     try:
         supabase = get_supabase_client()
@@ -206,19 +217,30 @@ async def analyze(
             "score": analysis_result["score"],
             "label": analysis_result["label"],
             "reasoning": analysis_result["reasoning"],
+            "highlighted_issues": analysis_result.get("highlighted_issues", []),
             "buzzer_indicators": analysis_result["buzzer_indicators"],
             "ip_hash": ip_hash,
         }
         db_result = supabase.table("analyses").insert(insert_data).execute()
+        if not db_result.data or not db_result.data[0].get("id"):
+            raise RuntimeError("Database tidak mengembalikan record ID setelah penyimpanan.")
         analysis_id = db_result.data[0]["id"]
-    except Exception:
-        # If DB save fails, still return the analysis result (graceful degradation)
-        analysis_id = "temp-" + ip_hash[:8]
+    except Exception as e:
+        logger.exception("Gagal menyimpan hasil analisis ke database: %s", e)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "Gagal menyimpan hasil analisis ke database. Silakan coba lagi.",
+                "code": "DATABASE_ERROR",
+            },
+        )
 
     # Step 8: Return result
     return {
         "success": True,
         "data": {
+            "id": analysis_id,
             "analysis_id": analysis_id,
             "input_type": input_type,
             "extracted_text": extracted_text[:500] + ("..." if len(extracted_text) > 500 else ""),

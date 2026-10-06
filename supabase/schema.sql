@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS analyses (
     score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
     label TEXT NOT NULL CHECK (label IN ('OBJEKTIF', 'CENDERUNG_BIAS', 'SANGAT_MANIPULATIF')),
     reasoning TEXT NOT NULL,
+    highlighted_issues JSONB DEFAULT '[]'::jsonb,
     buzzer_indicators JSONB DEFAULT '[]'::jsonb,
     ip_hash TEXT,  -- Hash dari IP address (untuk rate limiting & privasi)
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -89,3 +90,91 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX idx_audit_logs_action ON audit_logs(action_type);
 CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
+
+-- ============================================
+-- 8. Row Level Security (RLS) Policies
+-- ============================================
+
+-- Enable RLS on all public tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analyses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE crawled_articles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- 8.1 Users policies
+-- Anyone can read basic user profile info (needed to display comment authors)
+CREATE POLICY "Public users read" ON users
+    FOR SELECT USING (true);
+
+-- Authenticated users can insert their own profile
+CREATE POLICY "Users insert own profile" ON users
+    FOR INSERT WITH CHECK (auth.uid() = auth_id);
+
+-- Authenticated users can update their own profile
+CREATE POLICY "Users update own profile" ON users
+    FOR UPDATE USING (auth.uid() = auth_id) WITH CHECK (auth.uid() = auth_id);
+
+-- 8.2 Analyses policies
+-- Anyone can view public analyses
+CREATE POLICY "Public analyses read" ON analyses
+    FOR SELECT USING (true);
+
+-- Authenticated users can delete their own analyses
+CREATE POLICY "Users delete own analyses" ON analyses
+    FOR DELETE USING (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- 8.3 Crawled articles policies
+-- Anyone can view crawled articles
+CREATE POLICY "Public crawled_articles read" ON crawled_articles
+    FOR SELECT USING (true);
+
+-- 8.4 Votes policies
+-- Anyone can view vote counts and entries
+CREATE POLICY "Public votes read" ON votes
+    FOR SELECT USING (true);
+
+-- Authenticated users can insert votes for themselves
+CREATE POLICY "Auth users insert votes" ON votes
+    FOR INSERT WITH CHECK (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- Authenticated users can update their own vote
+CREATE POLICY "Auth users update votes" ON votes
+    FOR UPDATE USING (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()))
+    WITH CHECK (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- Authenticated users can delete their own vote
+CREATE POLICY "Auth users delete votes" ON votes
+    FOR DELETE USING (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- 8.5 Comments policies
+-- Anyone can view comments
+CREATE POLICY "Public comments read" ON comments
+    FOR SELECT USING (true);
+
+-- Authenticated users can insert comments for themselves
+CREATE POLICY "Auth users insert comments" ON comments
+    FOR INSERT WITH CHECK (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- Authenticated users can delete their own comments
+CREATE POLICY "Auth users delete comments" ON comments
+    FOR DELETE USING (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- 8.6 Audit logs policies
+-- Authenticated users can only view their own audit logs
+CREATE POLICY "Users view own audit logs" ON audit_logs
+    FOR SELECT USING (user_id IN (SELECT id FROM users WHERE auth_id = auth.uid()));
+
+-- 8.7 Column-level privacy grant
+-- Prevent anonymous harvesting of user email addresses while allowing public comment author display
+REVOKE SELECT ON users FROM anon;
+GRANT SELECT (id, name, created_at) ON users TO anon;
+GRANT SELECT (id, name, created_at, auth_id) ON users TO authenticated;
+
+-- Prevent public harvesting of user IP hashes while allowing reading analysis results (Critical Security Audit)
+REVOKE SELECT ON analyses FROM anon;
+GRANT SELECT (id, user_id, input_type, raw_input, extracted_text, detected_language, score, label, reasoning, highlighted_issues, buzzer_indicators, created_at) ON analyses TO anon, authenticated;
+
+-- Note: All backend service_role operations automatically bypass RLS.
+

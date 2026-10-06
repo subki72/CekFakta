@@ -5,14 +5,18 @@ Both endpoints require authentication (registered user only).
 Guest users cannot vote or comment.
 """
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from api.models.schemas import VoteRequest, CommentRequest
+from api.models.schemas import CommentRequest, VoteRequest
+from api.routes.analyses import get_vote_counts
 from api.services.supabase_client import get_supabase_client
+from api.utils.auth import get_current_user_optional
 from api.utils.rate_limiter import check_rate_limit
-from api.utils.auth import require_auth
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/analyses/{analysis_id}/vote")
@@ -23,7 +27,7 @@ async def vote_analysis(analysis_id: str, vote: VoteRequest, request: Request):
     """
     check_rate_limit(request)
 
-    user_id = await require_auth(request)
+    user_id = await get_current_user_optional(request)
     if not user_id:
         return JSONResponse(
             status_code=401,
@@ -61,16 +65,8 @@ async def vote_analysis(analysis_id: str, vote: VoteRequest, request: Request):
             on_conflict="analysis_id,user_id",
         ).execute()
 
-        # Return updated vote counts
-        all_votes = (
-            supabase.table("votes")
-            .select("is_agree")
-            .eq("analysis_id", analysis_id)
-            .execute()
-        )
-        votes_data = all_votes.data or []
-        vote_agree = sum(1 for v in votes_data if v["is_agree"])
-        vote_disagree = sum(1 for v in votes_data if not v["is_agree"])
+        # Return updated vote counts via efficient aggregation
+        vote_agree, vote_disagree = get_vote_counts(supabase, analysis_id)
 
         return {
             "success": True,
@@ -82,6 +78,7 @@ async def vote_analysis(analysis_id: str, vote: VoteRequest, request: Request):
         }
 
     except Exception as e:
+        logger.exception("Gagal menyimpan vote: %s", e)
         return JSONResponse(
             status_code=500,
             content={
@@ -100,7 +97,7 @@ async def add_comment(analysis_id: str, comment: CommentRequest, request: Reques
     """
     check_rate_limit(request)
 
-    user_id = await require_auth(request)
+    user_id = await get_current_user_optional(request)
     if not user_id:
         return JSONResponse(
             status_code=401,
@@ -157,6 +154,7 @@ async def add_comment(analysis_id: str, comment: CommentRequest, request: Reques
         }
 
     except Exception as e:
+        logger.exception("Gagal menyimpan komentar: %s", e)
         return JSONResponse(
             status_code=500,
             content={

@@ -13,7 +13,6 @@ import os
 
 import httpx
 
-
 OCR_API_URL = "https://api.ocr.space/parse/image"
 
 
@@ -47,7 +46,7 @@ async def extract_text_from_image(image_base64: str) -> str:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(OCR_API_URL, data=payload)
             response.raise_for_status()
     except (httpx.RequestError, httpx.TimeoutException) as e:

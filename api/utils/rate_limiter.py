@@ -8,6 +8,8 @@ This is acceptable for Vercel serverless because:
 - For 30 concurrent users, this provides sufficient protection
 """
 
+import hashlib
+import os
 import time
 from collections import defaultdict
 
@@ -16,7 +18,6 @@ from fastapi import Request
 
 class RateLimitExceeded(Exception):
     """Raised when a client exceeds the rate limit."""
-    pass
 
 
 # In-memory store: { ip_address: [timestamp1, timestamp2, ...] }
@@ -27,29 +28,47 @@ MAX_REQUESTS = 50
 WINDOW_SECONDS = 3600
 
 
+def get_client_ip(request: Request) -> str:
+    """Extract client IP securely prioritizing trusted reverse proxy headers."""
+    vercel_ip = request.headers.get("x-vercel-forwarded-for")
+    if vercel_ip:
+        return vercel_ip.split(",")[0].strip()
+
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "unknown"
+
+
 def check_rate_limit(request: Request) -> None:
     """
     Check if the client IP has exceeded the rate limit.
 
     Raises RateLimitExceeded if the limit is exceeded.
     """
-    # Get client IP (Vercel forwards the real IP in x-forwarded-for)
-    client_ip = request.headers.get(
-        "x-forwarded-for", request.client.host if request.client else "unknown"
-    )
-    # Take only the first IP if there are multiple (proxy chain)
-    client_ip = client_ip.split(",")[0].strip()
+    client_ip = get_client_ip(request)
 
     now = time.time()
     window_start = now - WINDOW_SECONDS
 
-    # Clean up old entries outside the window
-    _request_log[client_ip] = [
-        ts for ts in _request_log[client_ip] if ts > window_start
-    ]
+    # Clean up old entries outside the window and delete empty keys to prevent memory leak
+    if client_ip in _request_log:
+        active_timestamps = [ts for ts in _request_log[client_ip] if ts > window_start]
+        if active_timestamps:
+            _request_log[client_ip] = active_timestamps
+        else:
+            del _request_log[client_ip]
 
     # Check if limit exceeded
-    if len(_request_log[client_ip]) >= MAX_REQUESTS:
+    if len(_request_log.get(client_ip, [])) >= MAX_REQUESTS:
         raise RateLimitExceeded()
 
     # Record this request
@@ -58,15 +77,9 @@ def check_rate_limit(request: Request) -> None:
 
 def get_client_ip_hash(request: Request) -> str:
     """
-    Get a hashed version of the client IP for storage (privacy).
-
-    We use a simple hash — not cryptographically strong, but sufficient
-    for our use case of de-duplication rather than security.
+    Get a hashed version of the client IP with secret salt for storage (privacy).
     """
-    import hashlib
+    client_ip = get_client_ip(request)
+    salt = os.getenv("IP_HASH_SALT", "factguard_default_salt")
+    return hashlib.sha256(f"{client_ip}:{salt}".encode()).hexdigest()[:24]
 
-    client_ip = request.headers.get(
-        "x-forwarded-for", request.client.host if request.client else "unknown"
-    )
-    client_ip = client_ip.split(",")[0].strip()
-    return hashlib.sha256(client_ip.encode()).hexdigest()[:16]

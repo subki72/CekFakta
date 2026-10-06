@@ -8,12 +8,14 @@ full database access without row-level security restrictions.
 """
 
 import os
+from functools import lru_cache
 
 from supabase import Client, create_client
 
 
+@lru_cache(maxsize=1)
 def get_supabase_client() -> Client:
-    """Create and return a Supabase client instance."""
+    """Create and return a singleton Supabase client instance."""
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 

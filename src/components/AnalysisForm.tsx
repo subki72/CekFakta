@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { AnalysisResult } from "@/lib/api-client";
 import { analyzeText, analyzeImage } from "@/lib/api-client";
 import { FileText, Link, Image as ImageIcon, Zap, AlertTriangle } from "lucide-react";
@@ -21,6 +21,15 @@ export default function AnalysisForm({ onResult }: AnalysisFormProps) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Revoke object URL on unmount or previewUrl change to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const tabs: { key: InputTab; label: string; icon: React.ReactNode }[] = [
     { key: "TEXT", label: "TEKS", icon: <FileText className="w-5 h-5" /> },
     { key: "URL", label: "LINK", icon: <Link className="w-5 h-5" /> },
@@ -30,6 +39,9 @@ export default function AnalysisForm({ onResult }: AnalysisFormProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
     }
@@ -67,9 +79,30 @@ export default function AnalysisForm({ onResult }: AnalysisFormProps) {
 
       if (response.success && response.data) {
         onResult(response.data);
+        // Save to sessionStorage for guest history
+        try {
+          const raw = sessionStorage.getItem("factguard_history");
+          const existing = raw ? JSON.parse(raw) : [];
+          const newItem = {
+            ...response.data,
+            timestamp: new Date().toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          };
+          sessionStorage.setItem("factguard_history", JSON.stringify([newItem, ...existing].slice(0, 50)));
+        } catch {
+          // ignore sessionStorage write errors
+        }
         setTextInput("");
         setUrlInput("");
         setSelectedFile(null);
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
         setPreviewUrl(null);
       } else {
         setError(response.error || "Terjadi kesalahan. Silakan coba lagi.");
@@ -152,6 +185,7 @@ export default function AnalysisForm({ onResult }: AnalysisFormProps) {
             >
               {previewUrl ? (
                 <div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={previewUrl}
                     alt="Preview screenshot"

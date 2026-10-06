@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import AnalysisForm from "@/components/AnalysisForm";
 import ScoreDisplay from "@/components/ScoreDisplay";
 import type { AnalysisResult } from "@/lib/api-client";
@@ -67,10 +69,17 @@ export default function HomePage() {
           {result ? (
             <div>
               <ScoreDisplay result={result} />
-              <div className="mt-8 text-center">
+              <div className="mt-8 text-center flex flex-wrap justify-center gap-4">
+                <Link
+                  href={`/result/${result.analysis_id || result.id || ""}`}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>LIHAT DISKUSI & VOTE</span>
+                </Link>
                 <button
                   onClick={handleReset}
-                  className="btn-primary"
+                  className="btn-secondary"
                 >
                   CEK NARASI LAIN
                 </button>

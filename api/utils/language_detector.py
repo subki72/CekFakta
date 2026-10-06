@@ -6,6 +6,8 @@ This avoids adding heavy NLP libraries (keeping bundle size small for Vercel).
 For mixed-language text (BR5), detects the dominant language.
 """
 
+import re
+
 # Common Indonesian stopwords/function words that rarely appear in English
 INDONESIAN_MARKERS = {
     "yang", "dan", "di", "dari", "untuk", "dengan", "pada", "ini",
@@ -41,7 +43,7 @@ def detect_language(text: str) -> str:
     Returns:
         'id' for Indonesian, 'en' for English.
     """
-    words = text.lower().split()
+    words = re.findall(r"\b[\w-]+\b", text.lower())
 
     if not words:
         return "id"  # Default to Indonesian

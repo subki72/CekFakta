@@ -1,6 +1,6 @@
-import pytest
-from api.utils.language_detector import detect_language
 from api.utils.content_classifier import is_political_content
+from api.utils.language_detector import detect_language
+
 
 def test_detect_language_id():
     text = "Pemerintah dan DPR sedang membahas undang-undang baru hari ini."
@@ -33,4 +33,11 @@ def test_is_political_content_density():
     assert is_political_content(text) == True
 
 def test_is_political_content_empty():
-    assert is_political_content("") == False
+    assert is_political_content("") is False
+
+
+def test_is_political_content_with_punctuation():
+    # Punctuation attached to political keywords should still be recognized
+    text = "Presiden, Jokowi, dan jajaran menteri."
+    assert is_political_content(text) is True
+

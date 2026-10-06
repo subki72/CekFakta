@@ -5,6 +5,8 @@ Rejects non-political content (recipes, poems, code, etc.) before
 sending to the expensive Groq API. Uses keyword-based heuristic.
 """
 
+import re
+
 # Keywords that indicate political content (Indonesian & English)
 POLITICAL_KEYWORDS_ID = {
     "pemerintah", "presiden", "menteri", "dpr", "dprd", "mpr",
@@ -36,7 +38,6 @@ ALL_POLITICAL_KEYWORDS = POLITICAL_KEYWORDS_ID | POLITICAL_KEYWORDS_EN
 # Minimum percentage of words that should be political keywords
 MIN_POLITICAL_DENSITY = 0.02  # At least 2% of words should be political
 
-
 def is_political_content(text: str) -> bool:
     """
     Check if text is likely about politics.
@@ -47,7 +48,7 @@ def is_political_content(text: str) -> bool:
     Returns:
         True if the text appears to be political content.
     """
-    words = text.lower().split()
+    words = re.findall(r"\b[\w-]+\b", text.lower())
 
     if not words:
         return False
@@ -60,3 +61,4 @@ def is_political_content(text: str) -> bool:
 
     density = political_count / len(words)
     return density >= MIN_POLITICAL_DENSITY
+

@@ -16,6 +16,7 @@ export interface APIResponse<T = unknown> {
 
 export interface AnalysisResult {
   analysis_id: string;
+  id?: string;
   input_type: string;
   extracted_text: string;
   detected_language: string;
@@ -30,6 +31,7 @@ export interface AnalysisDetail extends AnalysisResult {
   created_at: string;
   vote_agree: number;
   vote_disagree: number;
+  user_vote?: boolean | null;
   comments: CommentData[];
 }
 
@@ -184,12 +186,16 @@ export async function addComment(
   });
 }
 
+export interface AnalysisHistoryItem extends AnalysisResult {
+  timestamp: string;
+}
+
 /**
  * Fetch analysis history for logged in user.
  */
-export async function getHistory(): Promise<any[] | null> {
-  const res = await apiFetch<any[]>("/api/analyses/history");
-  return res.success ? res.data! : null;
+export async function getHistory(): Promise<AnalysisHistoryItem[] | null> {
+  const res = await apiFetch<AnalysisHistoryItem[]>("/api/analyses/history");
+  return res.success && res.data ? res.data : null;
 }
 
 /**

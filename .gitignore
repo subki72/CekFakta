@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+.coverage
+.coverage.*
+.benchmarks/
 
 # next.js
 /.next/
@@ -60,3 +63,10 @@ venv/
 # AI instructions
 AGENTS.md
 CLAUDE.md
+
+# Internal reports & production assessments
+*REPORT*.md
+*ASSESSMENT*.md
+FINAL-PRODUCTION-REPORT.md
+PRODUCTION-READINESS-ASSESSMENT.md
+/qa-report/

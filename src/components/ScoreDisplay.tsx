@@ -23,9 +23,10 @@ function getStampProps(label: string): { text: string; color: string; borderClas
 
 export default function ScoreDisplay({ result }: ScoreDisplayProps) {
   const stamp = getStampProps(result.label);
+  const displayId = result.analysis_id || result.id || "";
 
   // Split reasoning into bullet points by finding periods, filtering out empty ones
-  const bulletPoints = result.reasoning
+  const bulletPoints = (result.reasoning || "")
     .split(/(?<=\.)\s+/)
     .filter((point) => point.trim().length > 10);
 
@@ -43,7 +44,7 @@ export default function ScoreDisplay({ result }: ScoreDisplayProps) {
           <div className="w-full h-1 mt-2 bg-current opacity-30"></div>
           <div className="flex justify-between items-center mt-2 px-1">
              <span className="text-lg font-bold">SKOR: {result.score}/100</span>
-             <span className="text-lg font-bold">ID: {result.analysis_id.slice(0,6)}</span>
+             <span className="text-lg font-bold">ID: {displayId.slice(0, 8)}</span>
           </div>
         </div>
       </div>
@@ -51,9 +52,9 @@ export default function ScoreDisplay({ result }: ScoreDisplayProps) {
       {/* Meta Info */}
       <div className="flex flex-wrap gap-2 mb-6 justify-center">
         <span className="px-3 py-1 bg-white border-2 border-black font-bold text-sm uppercase shadow-[2px_2px_0px_#000]">
-          {result.detected_language === "id" ? "BAHASA INDONESIA" : "ENGLISH"}
+          {result.detected_language === "id" ? "BAHASA INDONESIA" : "BAHASA INGGRIS"}
         </span>
-        {result.buzzer_indicators.length > 0 && (
+        {Boolean(result.buzzer_indicators && result.buzzer_indicators.length > 0) && (
           <span className="px-3 py-1 bg-red-100 text-red-700 border-2 border-red-700 font-bold text-sm uppercase shadow-[2px_2px_0px_#000] flex items-center">
             <AlertTriangle className="w-4 h-4 mr-2" /> INDIKASI BUZZER TERDETEKSI
           </span>
@@ -69,7 +70,7 @@ export default function ScoreDisplay({ result }: ScoreDisplayProps) {
         <ul className="space-y-4 mb-6">
           {bulletPoints.length > 0 ? (
             bulletPoints.map((point, index) => (
-              <li key={index} className="flex gap-4">
+              <li key={`point-${index}-${point.slice(0, 16)}`} className="flex gap-4">
                 <span className="flex-shrink-0 w-8 h-8 bg-black text-white font-bold flex items-center justify-center text-lg mt-0.5">
                   {index + 1}
                 </span>
@@ -99,7 +100,7 @@ export default function ScoreDisplay({ result }: ScoreDisplayProps) {
             <div className="space-y-3">
               {result.highlighted_issues.map((issue, i) => (
                 <div
-                  key={i}
+                  key={`${issue}-${i}`}
                   className="bg-red-50 border-l-[6px] border-red-500 p-4 font-bold text-sm"
                 >
                   &quot;{issue}&quot;
@@ -111,7 +112,7 @@ export default function ScoreDisplay({ result }: ScoreDisplayProps) {
 
         <div className="mt-8 text-center pt-4 border-t-4 border-black">
           <Link
-            href={`/result/${result.analysis_id}`}
+            href={`/result/${displayId}`}
             className="btn-ghost w-full block hover:bg-black hover:text-white"
           >
             Lihat Diskusi Komunitas

@@ -47,29 +47,40 @@ Aplikasi ini berjalan sebagai Monorepo (Next.js dan FastAPI berada di direktori 
 npm install
 
 # Instal dependency backend (Python)
-pip install -r api/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 4. Konfigurasi Environment Variables
-Buat file `.env` di *root directory* proyek, dan isi dengan variabel berikut:
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-
-GROQ_API_KEY=your_groq_api_key
-
-# Untuk pengembangan lokal
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Konfigurasi SMTP (Opsional, untuk fitur Kritik & Saran)
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USERNAME=email_anda@gmail.com
-SMTP_PASSWORD=password_aplikasi_gmail
+Salin file `.env.example` ke `.env` di *root directory* proyek, dan isi nilai kredensial Anda:
+```bash
+cp .env.example .env
 ```
 
-### 5. Menjalankan Aplikasi
+Pastikan variabel penting berikut terisi:
+- `GROQ_API_KEY`: Kunci API dari Groq Cloud Console.
+- `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY`: URL dan Anon Key Supabase.
+- `SUPABASE_SERVICE_ROLE_KEY`: Service role secret untuk operasi backend.
+- `CRON_SECRET`: Secret token untuk otentikasi cron job Vercel.
+
+### 5. Setup Database & Migrasi RLS
+Jalankan file SQL berikut pada Supabase SQL Editor:
+1. `supabase/schema.sql` (Inisialisasi tabel, relasi, indeks, dan RLS policies)
+2. Atau jalankan migrasi `supabase/migrations/20261005_enable_rls.sql` untuk mengaktifkan Row-Level Security pada database yang sudah berjalan.
+
+### 6. Menjalankan Tes & Verifikasi Kualitas
+Untuk memverifikasi kesiapan production:
+```bash
+# Menjalankan 38 automated unit & integration tests
+python -m pytest
+
+# Menjalankan linter Next.js/TypeScript
+npm run lint
+
+# Menjalankan production build frontend
+npm run build
+```
+
+### 7. Menjalankan Aplikasi (Local Development)
 Karena frontend (Next.js) dan backend (FastAPI) berjalan di *port* terpisah saat mode pengembangan, Anda perlu membuka **dua terminal**.
 
 **Terminal 1 (Backend - FastAPI):**

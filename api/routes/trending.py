@@ -5,11 +5,14 @@ Aggregates analysis data to show trending political topics,
 average objectivity scores, and label distributions (FR7).
 """
 
+import logging
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from api.services.supabase_client import get_supabase_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -27,7 +30,7 @@ async def get_trending():
         # Fetch recent analyses (last 7 days) ONLY from authenticated users (SR1.2)
         recent_analyses = (
             supabase.table("analyses")
-            .select("score, label, extracted_text, created_at")
+            .select("score, label, created_at")
             .not_.is_("user_id", "null")
             .order("created_at", desc=True)
             .limit(100)
@@ -93,6 +96,7 @@ async def get_trending():
         }
 
     except Exception as e:
+        logger.exception("Failed to get trending data: %s", e)
         return JSONResponse(
             status_code=500,
             content={

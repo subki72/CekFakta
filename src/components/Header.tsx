@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { ShieldCheck, Menu, X } from "lucide-react";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     // Check active session
@@ -36,8 +37,9 @@ export default function Header() {
       if (error) {
         alert("Gagal login: " + error.message + "\n(Pastikan Google Provider aktif di Supabase)");
       }
-    } catch (err: any) {
-      alert("Terjadi kesalahan saat login: " + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert("Terjadi kesalahan saat login: " + msg);
     }
   };
 
@@ -55,7 +57,7 @@ export default function Header() {
               <ShieldCheck className="w-7 h-7" />
             </div>
             <span className="text-xl sm:text-2xl font-black uppercase tracking-tighter">
-              Cek Fakta
+              FactGuard (Cek Fakta)
             </span>
           </Link>
 
@@ -98,12 +100,12 @@ export default function Header() {
                     {user.user_metadata?.name || user.email}
                   </span>
                   <button onClick={handleLogout} className="btn-ghost text-sm py-1 px-3">
-                    LOGOUT
+                    KELUAR
                   </button>
                 </div>
               ) : (
                 <button onClick={handleLogin} className="btn-primary text-sm py-2">
-                  LOGIN GOOGLE
+                  MASUK DENGAN GOOGLE
                 </button>
               )}
             </div>
@@ -160,12 +162,12 @@ export default function Header() {
                     {user.user_metadata?.name || user.email}
                   </span>
                   <button onClick={handleLogout} className="btn-ghost text-sm py-1 px-3 bg-red-100">
-                    LOGOUT
+                    KELUAR
                   </button>
                 </div>
               ) : (
                 <button onClick={handleLogin} className="btn-primary mt-4 w-full">
-                  LOGIN GOOGLE
+                  MASUK DENGAN GOOGLE
                 </button>
               )}
             </nav>

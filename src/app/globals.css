@@ -19,6 +19,7 @@
   --border-thick: 4px;
   --border-radius: 0px; /* Sharp corners */
   --shadow-color: #111111;
+  --background-secondary: #e7e2d8;
 }
 
 @theme inline {
@@ -222,3 +223,26 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   border: 2px solid var(--foreground);
 }
+
+/* Badges for Neo-Brutalism */
+.badge-objektif {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 2px solid #065f46;
+  font-weight: 800;
+}
+
+.badge-bias {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 2px solid #92400e;
+  font-weight: 800;
+}
+
+.badge-manipulatif {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 2px solid #991b1b;
+  font-weight: 800;
+}
+
