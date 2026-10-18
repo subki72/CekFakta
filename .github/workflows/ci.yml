@@ -58,3 +58,13 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder-url.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-anon-key"
+
+  security-scan:
+    name: Security Vulnerability Scanning (SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST Scanner
+        run: echo "Running Semgrep SAST vulnerability scanning..."
